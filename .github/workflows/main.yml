@@ -1,12 +1,12 @@
 name: Monthly Coffee Futures Update
 
 on:
-  workflow_dispatch:     # manual trigger option
+  workflow_dispatch:     # allow manual trigger
   schedule:
     - cron: "0 6 1 * *"  # run at 06:00 UTC on the 1st of each month
 
 permissions:
-  contents: write   # <-- allow pushing to repo
+  contents: write        # allow pushing back to the repo
 
 jobs:
   update:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}   # use auto-generated token
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
