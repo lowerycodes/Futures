@@ -3,7 +3,7 @@ import requests
 from datetime import datetime
 
 # === CONFIG ===
-BASE_URL = "https://webapp-proxy.aws.barchart.com/v1/proxies/timeseries/historical/queryeod.ashx?symbol=KC{expiry}&data=daily&maxrecords=90&volume=total&order=asc&dividends=false&backadjust=false&daystoexpiration=1&contractroll=expiration&username=demochartsnew_rt&password=demochartsnew"  
+BASE_URL = "https://webapp-proxy.aws.barchart.com/v1/proxies/timeseries/historical/queryeod.ashx?symbol={contract}&data=daily&maxrecords=90&volume=total&order=asc&dividends=false&backadjust=false&daystoexpiration=1&contractroll=expiration&username=demochartsnew_rt&password=demochartsnew"  
 # Replace ^ with the actual ashx URL you use, insert {symbol} and {expiry} placeholders if needed
 SYMBOL = "KC"  # Coffee futures root
 OUTPUT_DIR = "coffee_data"
