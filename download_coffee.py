@@ -3,8 +3,12 @@ import requests
 from datetime import datetime
 
 # === CONFIG ===
-BASE_URL = "https://webapp-proxy.aws.barchart.com/v1/proxies/timeseries/historical/queryeod.ashx?symbol={contract}&data=daily&maxrecords=90&volume=total&order=asc&dividends=false&backadjust=false&daystoexpiration=1&contractroll=expiration&username=demochartsnew_rt&password=demochartsnew"  
-# Replace ^ with the actual ashx URL you use, insert {symbol} and {expiry} placeholders if needed
+BASE_URL = (
+    "https://webapp-proxy.aws.barchart.com/v1/proxies/timeseries/historical/queryeod.ashx"
+    "?symbol={contract}&data=daily&maxrecords=120&volume=total&order=asc"
+    "&dividends=false&backadjust=false&daystoexpiration=1&contractroll=expiration"
+    "&username=demochartsnew_rt&password=demochartsnew"
+)
 SYMBOL = "KC"  # Coffee futures root
 OUTPUT_DIR = "coffee_data"
 INDEX_FILE = "index.html"
@@ -24,19 +28,25 @@ def get_contracts(years_back=YEARS_BACK):
     start_year = current_year - years_back
 
     for year in range(start_year, current_year + 1):
+        yy = str(year)[-2:]  # 2-digit year
         for code in MONTH_CODES:
-            contracts.append(f"{SYMBOL}{code}{str(year)[-2:]}")
+            contracts.append(f"{SYMBOL}{code}{yy}")
     return contracts
 
 
 def download_contract(contract):
     """Download a single contract file from the ashx URL."""
-    url = BASE_URL.format(symbol=SYMBOL, expiry=contract)
+    url = BASE_URL.format(contract=contract)
     filename = os.path.join(OUTPUT_DIR, f"{contract}.csv")
 
+    print(f"Fetching {contract} → {url}")  # log full URL
+
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, timeout=20)
         r.raise_for_status()
+        if b"Invalid" in r.content or len(r.content) < 50:
+            print(f"No data for {contract}")
+            return None
         with open(filename, "wb") as f:
             f.write(r.content)
         print(f"Downloaded {contract}")
@@ -61,7 +71,7 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     contracts = get_contracts()
     downloaded_files = [download_contract(c) for c in contracts]
-    make_index(downloaded_files)
+    make_index([f for f in downloaded_files if f])
 
 
 if __name__ == "__main__":
