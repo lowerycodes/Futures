@@ -1,40 +1,40 @@
-name: Generate 2-Month Spread Charts
+name: Generate Coffee 2-Month Spreads
 
 on:
   push:
-    branches: [ main ]
+    paths:
+      - 'coffee_data/**'
   workflow_dispatch:
 
 jobs:
-  build:
+  generate_spreads:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        persist-credentials: true  # Needed to push
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install dependencies
-      run: |
-        pip install --upgrade pip
-        pip install pandas matplotlib
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas matplotlib
 
-    - name: Run spread generator
-      run: |
-        python generate_spread_charts_html.py --dir coffee_data --out spreads.html
+      - name: Generate Coffee 2-Month Spreads
+        run: |
+          python generate_spread_charts_html.py --dir coffee_data --out index.html
 
-    - name: Commit and push generated charts & HTML
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add coffee_data/charts/* coffee_data/spreads.html
-        git diff --cached --quiet || git commit -m "Update 2-month spreads [skip ci]"
-        git push
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add coffee_data/charts/*.png index.html
+          git diff --cached --quiet || git commit -m "Update coffee 2-month spreads and index.html"
+          git push
+        env:
+          # Needed if repo is private
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
