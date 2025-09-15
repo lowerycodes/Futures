@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """
-generate_spread_charts_html.py
+generate_coffee_spread_charts.py
 
-Scan a directory for futures monthly CSVs, pair adjacent month contracts,
+Scan `coffee_data` folder for futures monthly CSVs, pair adjacent month contracts,
 compute spreads, generate charts (stretched to window), embed them as
-base64 in a single HTML, and show spread values below each chart (no year in dates).
+base64 in a single HTML, and show spread values below each chart (dates without year).
 
 Usage:
-    python generate_spread_charts_html.py --dir ./csvs --out spreads.html
+    python generate_coffee_spread_charts.py --out spreads.html
 
 Requirements:
     pip install pandas matplotlib
 """
-
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -20,19 +19,16 @@ import re, base64, io, argparse
 from datetime import datetime
 import html
 
-# Futures month codes
+# Month codes
 MONTH_CODES = {'F':1,'G':2,'H':3,'J':4,'K':5,'M':6,'N':7,'Q':8,'U':9,'V':10,'X':11,'Z':12}
 FNAME_RE = re.compile(r'^(?P<root>.+?)(?P<month>[FGHJKMNQUVXZ])(?P<year>\d{2,4})?$', re.IGNORECASE)
 
 def parse_filename(fname):
     m = FNAME_RE.match(fname)
     if not m: return None
-    root = m.group('root')
-    month = m.group('month').upper()
-    y = m.group('year')
-    year = None
-    if y:
-        year = int(y) if len(y)==4 else 2000+int(y)
+    root, month = m.group('root'), m.group('month').upper()
+    year = m.group('year')
+    if year: year = int(year) if len(year)==4 else 2000+int(year)
     return root, month, year
 
 def scan_csvs(directory: Path):
@@ -56,15 +52,14 @@ def read_series(path: Path, date_col="Date", price_col="Close"):
     df = df.set_index("Date")
     return df
 
-def make_chart_base64(a_path, b_path, date_col="Date", price_col="Close"):
-    a = read_series(a_path, date_col, price_col)
-    b = read_series(b_path, date_col, price_col)
+def make_chart_base64(a_path, b_path):
+    a = read_series(a_path)
+    b = read_series(b_path)
     common = a.join(b, how="inner", lsuffix="_A", rsuffix="_B")
     if common.empty: return None
     common["Spread"] = common["Price_A"] - common["Price_B"]
     dates_noyear = [d.strftime("%b %d") for d in common.index]
 
-    # Plot
     plt.figure(figsize=(12,6))
     plt.plot(dates_noyear, common["Price_A"], label=a_path.stem)
     plt.plot(dates_noyear, common["Price_B"], label=b_path.stem)
@@ -84,33 +79,38 @@ def make_chart_base64(a_path, b_path, date_col="Date", price_col="Close"):
     return {"title": f"{a_path.stem} - {b_path.stem}", "img": img_b64, "rows_html": rows_html}
 
 def generate_html(results, out_html: Path):
-    parts = []
-    parts.append("<!DOCTYPE html><html><head><meta charset='utf-8'>")
-    parts.append(f"<title>2-Month Spreads</title>")
+    parts = ["<!DOCTYPE html><html><head><meta charset='utf-8'>"]
+    parts.append("<title>Coffee 2-Month Spreads</title>")
     parts.append("<style>"
                  "body{font-family:Arial;margin:0;padding:0;}"
                  ".chart{width:100vw;text-align:center;margin-bottom:20px;}"
                  "img{width:100%;height:auto;display:block;}"
                  ".spreads{text-align:center;font-size:14px;margin-bottom:40px;}"
                  "</style></head><body>")
-    parts.append(f"<h1 style='text-align:center;'>2-Month Spread Charts</h1>")
+    parts.append(f"<h1 style='text-align:center;'>Coffee 2-Month Spread Charts</h1>")
     parts.append(f"<p style='text-align:center;font-size:12px;'>Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>")
+
     for r in results:
         parts.append("<div class='chart'>")
         parts.append(f"<h2>{html.escape(r['title'])}</h2>")
         parts.append(f"<img src='data:image/png;base64,{r['img']}' alt='{html.escape(r['title'])}'>")
         parts.append(f"<div class='spreads'>{r['rows_html']}</div>")
         parts.append("</div>")
+
     parts.append("</body></html>")
     out_html.write_text("\n".join(parts), encoding="utf-8")
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dir","-d", default=".", help="Directory with CSVs")
+    parser.add_argument("--dir","-d", default="coffee_data", help="Directory with CSVs (default: coffee_data)")
     parser.add_argument("--out","-o", default="spreads.html", help="Output HTML")
     args = parser.parse_args()
 
     basedir = Path(args.dir)
+    if not basedir.exists():
+        print(f"Directory {basedir} does not exist!")
+        return
+
     parsed = scan_csvs(basedir)
     results = []
 
