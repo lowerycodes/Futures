@@ -66,12 +66,12 @@ def make_ohlc_chart(a_path, b_path, output_dir: Path):
 
     chart_file = output_dir / f"{a_path.stem}_{b_path.stem}_ohlc.png"
 
-    # Plot candlestick OHLC with Close line
+    # Plot candlestick OHLC with Close line (use 'linewidths' instead of 'linewidth')
     mpf.plot(
         ohlc,
         type="candle",
         style="charles",
-        addplot=mpf.make_addplot(ohlc["Close"], color="blue", linewidth=1.5),
+        addplot=mpf.make_addplot(ohlc["Close"], color="blue", linewidths=1.5),
         volume=False,
         tight_layout=True,
         ylabel="Spread",
