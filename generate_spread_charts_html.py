@@ -5,7 +5,7 @@ Generate 2-month coffee spreads from headerless CSVs.
 - Only coffee month codes: H, K, N, U, Z
 - Skip 1-month spreads (take entries[i] + entries[i+2])
 - Output PNG charts in coffee_data/charts
-- Generate index.html in main directory referencing the PNGs
+- Generate index.html in main directory referencing PNGs
 """
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -83,7 +83,8 @@ def generate_html(results, out_html: Path, charts_dir: Path):
     for r in results:
         parts.append("<div class='chart'>")
         parts.append(f"<h2>{r['title']}</h2>")
-        parts.append(f"<img src='{charts_dir.name}/{r['chart_file']}' alt='{r['title']}'>")
+        # fix: use relative path from main dir to coffee_data/charts
+        parts.append(f"<img src='coffee_data/charts/{r['chart_file']}' alt='{r['title']}'>")
         parts.append("</div>")
 
     parts.append("</body></html>")
