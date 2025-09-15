@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Generate 2-month coffee spreads from headerless CSVs in coffee_data.
+Generate 2-month coffee spreads from headerless CSVs.
 - Only KC contracts.
 - Only coffee month codes: H, K, N, U, Z
-- Skip 1-month spreads (take entries[i] + entries[i+2]).
-- Output PNG charts and HTML referencing them.
-- Weekly X-axis labels, no spread text below chart.
+- Skip 1-month spreads (take entries[i] + entries[i+2])
+- Output PNG charts in coffee_data/charts
+- Generate index.html in main directory referencing the PNGs
 """
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,7 +13,6 @@ from pathlib import Path
 from datetime import datetime
 import re
 
-# Only coffee month codes H, K, N, U, Z
 COFFEE_MONTH_CODES = {'H':3, 'K':5, 'N':7, 'U':9, 'Z':12}
 FNAME_RE = re.compile(r'^(?P<root>.+?)(?P<month>[HKNUZ])(?P<year>\d{2,4})?$', re.IGNORECASE)
 
@@ -94,7 +93,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir","-d", default="coffee_data", help="Directory with headerless CSVs")
-    parser.add_argument("--out","-o", default="spreads.html", help="Output HTML file")
+    parser.add_argument("--out","-o", default="index.html", help="Output HTML file in main dir")
     args = parser.parse_args()
 
     basedir = Path(args.dir)
@@ -124,7 +123,7 @@ def main():
             except Exception as e:
                 print(f"Error processing {a} / {b}: {e}")
 
-    out_html = basedir / args.out
+    out_html = Path(args.out)
     generate_html(results, out_html, charts_dir)
     print(f"Done. HTML written to {out_html}")
 
