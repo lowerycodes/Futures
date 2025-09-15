@@ -1,23 +1,14 @@
 #!/usr/bin/env python3
 """
-generate_coffee_spread_charts.py
-
-Scan `coffee_data` folder for futures monthly CSVs, pair adjacent month contracts,
-compute spreads, generate charts (stretched to window), embed them as
-base64 in a single HTML, and show spread values below each chart (dates without year).
-
-Usage:
-    python generate_coffee_spread_charts.py --out spreads.html
-
-Requirements:
-    pip install pandas matplotlib
+Generate 2-month spreads charts from headerless CSVs in coffee_data
+and embed charts + spreads in a single HTML.
 """
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
-import re, base64, io, argparse
+import base64, io, argparse, html
 from datetime import datetime
-import html
+import re
 
 # Month codes
 MONTH_CODES = {'F':1,'G':2,'H':3,'J':4,'K':5,'M':6,'N':7,'Q':8,'U':9,'V':10,'X':11,'Z':12}
@@ -43,10 +34,11 @@ def scan_csvs(directory: Path):
 def sort_entries(entries):
     return sorted(entries, key=lambda e: ((e["year"] if e["year"] else 9999), MONTH_CODES[e["month"]]))
 
-def read_series(path: Path, date_col="Date", price_col="Close"):
-    df = pd.read_csv(path, parse_dates=[date_col])
-    df = df[[date_col, price_col]].dropna()
-    df = df.rename(columns={date_col:"Date", price_col:"Price"})
+def read_series(path: Path):
+    cols = ["contract","date","open","high","low","close","volume","trades"]
+    df = pd.read_csv(path, header=None, names=cols, parse_dates=["date"])
+    df = df[["date","close"]].dropna()
+    df = df.rename(columns={"date":"Date","close":"Price"})
     df["Date"] = pd.to_datetime(df["Date"]).dt.normalize()
     df = df.sort_values("Date").drop_duplicates("Date")
     df = df.set_index("Date")
@@ -80,14 +72,14 @@ def make_chart_base64(a_path, b_path):
 
 def generate_html(results, out_html: Path):
     parts = ["<!DOCTYPE html><html><head><meta charset='utf-8'>"]
-    parts.append("<title>Coffee 2-Month Spreads</title>")
+    parts.append("<title>2-Month Spread Charts</title>")
     parts.append("<style>"
                  "body{font-family:Arial;margin:0;padding:0;}"
                  ".chart{width:100vw;text-align:center;margin-bottom:20px;}"
                  "img{width:100%;height:auto;display:block;}"
                  ".spreads{text-align:center;font-size:14px;margin-bottom:40px;}"
                  "</style></head><body>")
-    parts.append(f"<h1 style='text-align:center;'>Coffee 2-Month Spread Charts</h1>")
+    parts.append(f"<h1 style='text-align:center;'>2-Month Spread Charts</h1>")
     parts.append(f"<p style='text-align:center;font-size:12px;'>Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>")
 
     for r in results:
@@ -102,8 +94,8 @@ def generate_html(results, out_html: Path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dir","-d", default="coffee_data", help="Directory with CSVs (default: coffee_data)")
-    parser.add_argument("--out","-o", default="spreads.html", help="Output HTML")
+    parser.add_argument("--dir","-d", default="coffee_data", help="Directory with headerless CSVs")
+    parser.add_argument("--out","-o", default="spreads.html", help="Output HTML file")
     args = parser.parse_args()
 
     basedir = Path(args.dir)
