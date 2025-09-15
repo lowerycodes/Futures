@@ -6,12 +6,14 @@ Generate 2-month coffee spreads from headerless CSVs.
 - Skip 1-month spreads (take entries[i] + entries[i+2])
 - Output PNG charts in coffee_data/charts
 - Generate index.html in main directory referencing PNGs
+- Weekly X-axis with markers to avoid overlapping/sideways lines
 """
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
 import re
+import matplotlib.dates as mdates
 
 COFFEE_MONTH_CODES = {'H':3, 'K':5, 'N':7, 'U':9, 'Z':12}
 FNAME_RE = re.compile(r'^(?P<root>.+?)(?P<month>[HKNUZ])(?P<year>\d{2,4})?$', re.IGNORECASE)
@@ -49,21 +51,30 @@ def read_series(path: Path):
 def make_chart(a_path, b_path, output_dir: Path):
     a = read_series(a_path)
     b = read_series(b_path)
+    
+    # Join on dates
     common = a.join(b, how="inner", lsuffix="_A", rsuffix="_B")
-    if common.empty: return None
+    if common.empty:
+        return None
+    
+    # Compute spread
     common["Spread"] = common["Price_A"] - common["Price_B"]
 
-    # Weekly X-axis labels
-    dates_noyear = [d.strftime("%b %d") if i%5==0 else "" for i,d in enumerate(common.index)]
+    # Resample to weekly (Monday) to reduce clutter
+    weekly = common["Spread"].resample('W-MON').mean()
 
     plt.figure(figsize=(12,6))
-    plt.plot(dates_noyear, common["Spread"], color="blue")
+    plt.plot(weekly.index, weekly.values, color="blue", marker='o')
     plt.title(f"2-Month Coffee Spread: {a_path.stem}-{b_path.stem}")
-    plt.xlabel("Date (weekly)")
+    plt.xlabel("Date")
     plt.ylabel("Spread")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
 
+    # Format X-axis for weekly ticks
+    plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO, interval=1))
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+    plt.xticks(rotation=45)
+
+    plt.tight_layout()
     chart_file = output_dir / f"{a_path.stem}_{b_path.stem}_spread.png"
     plt.savefig(chart_file, dpi=150)
     plt.close()
@@ -83,7 +94,6 @@ def generate_html(results, out_html: Path, charts_dir: Path):
     for r in results:
         parts.append("<div class='chart'>")
         parts.append(f"<h2>{r['title']}</h2>")
-        # fix: use relative path from main dir to coffee_data/charts
         parts.append(f"<img src='coffee_data/charts/{r['chart_file']}' alt='{r['title']}'>")
         parts.append("</div>")
 
@@ -105,7 +115,7 @@ def main():
     results = []
 
     for root, entries in parsed.items():
-        # Only coffee contracts
+        # Only KC contracts
         if not root.upper().startswith("KC"):
             continue
         # Filter only coffee month codes H,K,N,U,Z
