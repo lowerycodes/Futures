@@ -27,7 +27,7 @@ jobs:
 
     - name: Run spread generator
       run: |
-        python generate_coffee_spread_charts.py --dir coffee_data --out spreads.html
+        python generate_spread_charts_html.py --dir coffee_data --out spreads.html
 
     - name: Commit and push generated HTML
       run: |
