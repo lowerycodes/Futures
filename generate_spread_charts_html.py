@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """
-Generate 2-month coffee spreads from headerless CSVs.
+Generate 2-month coffee spreads from headerless CSVs as daily OHLC charts.
 - Only KC contracts.
 - Only coffee month codes: H, K, N, U, Z
-- Skip 1-month spreads (take entries[i] + entries[i+2])
+- Skip 1-month spreads (entries[i] + entries[i+2])
 - Output PNG charts in coffee_data/charts
 - Generate index.html in main directory referencing PNGs
-- Weekly X-axis with markers to avoid overlapping/sideways lines
+- OHLC candlesticks colored by daily movement with Close line overlay
 """
 import pandas as pd
-import matplotlib.pyplot as plt
 from pathlib import Path
 from datetime import datetime
 import re
-import matplotlib.dates as mdates
+import mplfinance as mpf
 
 COFFEE_MONTH_CODES = {'H':3, 'K':5, 'N':7, 'U':9, 'Z':12}
 FNAME_RE = re.compile(r'^(?P<root>.+?)(?P<month>[HKNUZ])(?P<year>\d{2,4})?$', re.IGNORECASE)
@@ -41,43 +40,44 @@ def sort_entries(entries):
 def read_series(path: Path):
     cols = ["contract","date","open","high","low","close","volume","trades"]
     df = pd.read_csv(path, header=None, names=cols, parse_dates=["date"])
-    df = df[["date","close"]].dropna()
-    df = df.rename(columns={"date":"Date","close":"Price"})
+    df = df[["date","open","high","low","close"]].dropna()
+    df = df.rename(columns={"date":"Date","open":"Open","high":"High","low":"Low","close":"Close"})
     df["Date"] = pd.to_datetime(df["Date"]).dt.normalize()
     df = df.sort_values("Date").drop_duplicates("Date")
     df = df.set_index("Date")
     return df
 
-def make_chart(a_path, b_path, output_dir: Path):
+def make_ohlc_chart(a_path, b_path, output_dir: Path):
     a = read_series(a_path)
     b = read_series(b_path)
     
-    # Join on dates
-    common = a.join(b, how="inner", lsuffix="_A", rsuffix="_B")
-    if common.empty:
+    # Align by date
+    df = a.join(b, how="inner", lsuffix="_A", rsuffix="_B")
+    if df.empty:
         return None
     
-    # Compute spread
-    common["Spread"] = common["Price_A"] - common["Price_B"]
+    # Spread OHLC
+    ohlc = pd.DataFrame({
+        "Open": df["Open_A"] - df["Open_B"],
+        "High": df["High_A"] - df["High_B"],
+        "Low": df["Low_A"] - df["Low_B"],
+        "Close": df["Close_A"] - df["Close_B"]
+    }, index=df.index)
 
-    # Resample to weekly (Monday) to reduce clutter
-    weekly = common["Spread"].resample('W-MON').mean()
+    chart_file = output_dir / f"{a_path.stem}_{b_path.stem}_ohlc.png"
 
-    plt.figure(figsize=(12,6))
-    plt.plot(weekly.index, weekly.values, color="blue", marker='o')
-    plt.title(f"2-Month Coffee Spread: {a_path.stem}-{b_path.stem}")
-    plt.xlabel("Date")
-    plt.ylabel("Spread")
-
-    # Format X-axis for weekly ticks
-    plt.gca().xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO, interval=1))
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-    plt.xticks(rotation=45)
-
-    plt.tight_layout()
-    chart_file = output_dir / f"{a_path.stem}_{b_path.stem}_spread.png"
-    plt.savefig(chart_file, dpi=150)
-    plt.close()
+    # Plot candlestick OHLC with Close line
+    mpf.plot(
+        ohlc,
+        type="candle",
+        style="charles",
+        addplot=mpf.make_addplot(ohlc["Close"], color="blue", linewidth=1.5),
+        volume=False,
+        tight_layout=True,
+        ylabel="Spread",
+        datetime_format="%b %d",
+        savefig=dict(fname=chart_file, dpi=150)
+    )
     return chart_file.name
 
 def generate_html(results, out_html: Path, charts_dir: Path):
@@ -88,7 +88,7 @@ def generate_html(results, out_html: Path, charts_dir: Path):
                  ".chart{text-align:center;margin-bottom:30px;}"
                  "img{max-width:100%;height:auto;}"
                  "</style></head><body>")
-    parts.append(f"<h1 style='text-align:center;'>2-Month Coffee Spread Charts</h1>")
+    parts.append(f"<h1 style='text-align:center;'>2-Month Coffee Spread Charts (OHLC)</h1>")
     parts.append(f"<p style='text-align:center;font-size:12px;'>Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>")
 
     for r in results:
@@ -115,10 +115,8 @@ def main():
     results = []
 
     for root, entries in parsed.items():
-        # Only KC contracts
         if not root.upper().startswith("KC"):
             continue
-        # Filter only coffee month codes H,K,N,U,Z
         entries = [e for e in entries if e["month"] in COFFEE_MONTH_CODES]
         if len(entries)<2:
             continue
@@ -126,9 +124,9 @@ def main():
         # 2-month spreads: skip 1-month
         for i in range(len(entries)-2):
             a = entries[i]["path"]
-            b = entries[i+2]["path"]  # skip one month
+            b = entries[i+2]["path"]
             try:
-                chart_name = make_chart(a, b, charts_dir)
+                chart_name = make_ohlc_chart(a, b, charts_dir)
                 if chart_name:
                     results.append({"title": f"{a.stem}-{b.stem}", "chart_file": chart_name})
             except Exception as e:
