@@ -1,4 +1,4 @@
-name: Generate Coffee Spreads
+name: Generate Spreads HTML
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        persist-credentials: true  # Needed for pushing
+        persist-credentials: true  # Needed to push
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -29,7 +29,7 @@ jobs:
       run: |
         python generate_spread_charts_html.py --dir coffee_data --out spreads.html
 
-    - name: Commit and push generated HTML
+    - name: Commit and push HTML
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
